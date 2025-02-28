@@ -21,8 +21,10 @@ class KMGCLModel(nn.Module):
         self.smiles_encoder = Encoder(model=smiles_model, trainable=False)
         self.sign_predictor = nn.Linear(config.projection_dim[0]*2, 3)
         self.graphMetric_method = config.graphMetric_method
+        self.nodeMetric_method = config.nodeMetric_method
         self.alpha = config.alpha
         self.device = config.device
+        self.config = config
 
     def forward(self, batch):
 
@@ -30,6 +32,8 @@ class KMGCLModel(nn.Module):
         # Zhengyang's modification to use Molecule Dataset
         graph = batch['smiles_input'].batch_graph()
         #print(len(graph))
+        def eye_like(tensor):
+            return torch.eye(*tensor.size(), out=torch.empty_like(tensor))
         
         mask = torch.nonzero(batch['graph'].x[:, 0] == 5.0).squeeze(1)
         
@@ -59,7 +63,7 @@ class KMGCLModel(nn.Module):
 
         # Sign prediction
         # Apply the linear transformation
-        logits_sign = self.sign_predictor(pairwise_embeddings_matrix)
+        # logits_sign = self.sign_predictor(pairwise_embeddings_matrix)
 
         # Define the cross-entropy loss function
         criterion = nn.CrossEntropyLoss()
@@ -67,30 +71,57 @@ class KMGCLModel(nn.Module):
         
         
         ppm_diff = batch['peak']
-        sign_labels =  batch['peaksign']
 
-        # Calculate the loss
-        sign_loss = criterion(logits_sign, sign_labels)
-        
-        _, predicted_classes = torch.max(logits_sign, dim=1)
-        correct_predictions = (predicted_classes == sign_labels)
-        accuracy = correct_predictions.float().mean().item()
-
-        print(f'Peak Sign Classification Accuracy: {accuracy:.4f}')
         #print("ppm_diff shape")
         #print(ppm_diff.shape)
-        nodeMetric = F.softmax(ppm_diff, dim=-1)
-
-        # nodeLoss
-        nodeLogits = nodeEmbedding @ nodeEmbedding.T
-        nodeLoss = F.cross_entropy(nodeLogits, nodeMetric) + F.cross_entropy(nodeLogits.T, nodeMetric.T) + sign_loss
+        if "CL" in self.nodeMetric_method:
+            similarity_matrix_node = torch.matmul(nodeEmbedding, nodeEmbedding.T)
+            positives_node = torch.diagonal(similarity_matrix_node)
+            nodeLogits = similarity_matrix_node      # Scale similarities
+            nodeLabels = eye_like(similarity_matrix_node)  # Identity labels
+            nodeLoss = F.cross_entropy(nodeLogits, nodeLabels)
+        elif "TL" in self.nodeMetric_method:
+            similarity_matrix_node = torch.matmul(nodeEmbedding, nodeEmbedding.T)
+            positives_node = torch.diagonal(similarity_matrix_node)
+            mask_node = eye_like(similarity_matrix_node)  # Identity mask
+            negatives_node = similarity_matrix_node - mask_node * 1e6  # Ignore diagonal
+            hardest_negatives_node = negatives_node.max(dim=1)[0] 
+            nodeLoss = F.relu(1 - positives_node + 0.3 - (1 - hardest_negatives_node)).mean() # Margin should be considered
+        else:
+            nodeMetric = F.softmax(ppm_diff, dim=-1)
+            # nodeLoss
+            nodeLogits = nodeEmbedding @ nodeEmbedding.T
+            nodeLoss = F.cross_entropy(nodeLogits, nodeMetric) + F.cross_entropy(nodeLogits.T, nodeMetric.T)
 
         # graphMetric
-        graphMetric = self.genGraphMetric(batch)
-
-        # graphLoss
-        graphLogits = graphEmbedding @ graphEmbedding.T
-        graphLoss = F.cross_entropy(graphLogits, graphMetric) + F.cross_entropy(graphLogits.T, graphMetric.T)
+        if "CL" in self.graphMetric_method:
+            target_embedding = self.genTargetEmbedding(batch)
+            target_embedding = F.normalize(target_embedding, p=2, dim=1)
+            projection = Projection(target_embedding.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
+            target_embedding = projection(target_embedding)
+            similarity_matrix = torch.matmul(graphEmbedding, target_embedding.T)
+            positives = torch.diagonal(similarity_matrix)
+            graphLogits = similarity_matrix      # Scale similarities
+            graphLabels = eye_like(similarity_matrix)  # Identity labels
+            graphLoss = F.cross_entropy(graphLogits, graphLabels)
+            
+        elif "TL" in self.graphMetric_method:
+            target_embedding = self.genTargetEmbedding(batch)
+            target_embedding = F.normalize(target_embedding, p=2, dim=1)
+            projection = Projection(target_embedding.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
+            target_embedding = projection(target_embedding)
+            similarity_matrix = torch.matmul(graphEmbedding, target_embedding.T)
+            positives = torch.diagonal(similarity_matrix)
+            graphLogits = similarity_matrix 
+            mask = eye_like(similarity_matrix)  # Identity mask
+            negatives = similarity_matrix - mask * 1e6  # Ignore diagonal
+            hardest_negatives = negatives.max(dim=1)[0] 
+            graphLoss = F.relu(1 - positives + 0.3 - (1 - hardest_negatives)).mean() # Margin should be considered
+        else:
+            graphMetric = self.genGraphMetric(batch)
+            # graphLoss
+            graphLogits = graphEmbedding @ graphEmbedding.T
+            graphLoss = F.cross_entropy(graphLogits, graphMetric) + F.cross_entropy(graphLogits.T, graphMetric.T)
 
         loss = self.alpha * nodeLoss + (1-self.alpha) * graphLoss
         return loss, nodeLoss, graphLoss, graphLogits
@@ -182,6 +213,45 @@ class KMGCLModel(nn.Module):
         fusion_metric_fingerprint = 0.25 * image_metric + 0.25 * nmr_metric + 0.25 * smiles_metric + 0.25* fingerprint_metric
 
         return fusion_metric_fingerprint
+    
+    def compute_image_embedding(self,image):
+        image_embeddings = self.image_encoder(image)
+#         projection = Projection(image_embeddings.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
+#         image_embeddings = projection(image_embeddings)
+        return image_embeddingss
+    
+    def compute_nmr_embedding(self,nmr):
+        nmr_embeddings = self.nmr_encoder(nmr)
+#         projection = Projection(nmr_embeddings.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
+#         nmr_embeddings = projection(nmr_embeddings)
+        return nmr_embeddings
+    
+    def compute_smiles_embedding(self,smiles):
+        smiles_embeddings = self.smiles_encoder(smiles)
+#         projection = Projection(smiles_embeddings.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
+#         smiles_embeddings = projection(smiles_embeddings)
+        return smiles_embeddings
+    
+    def compute_fingerprint_embedding(self,fingerprint):
+        fingerprint_embeddings = fingerprint
+#         projection = Projection(fingerprint_embeddings.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
+#         fingerprint_embeddings = projection(fingerprint_embeddings)
+        return fingerprint_embeddings
+    
+    
+    def genTargetEmbedding(self, batch):
+        with torch.no_grad():
+            if self.graphMetric_method == 'image_CL' or self.graphMetric_method == 'image_TL':
+                targetEmbedding = self.compute_image_embedding(batch['image'])
+            elif self.graphMetric_method == 'nmr_CL' or self.graphMetric_method == 'nmr_TL':
+                targetEmbedding = self.compute_nmr_embedding(batch['nmr'])
+            elif self.graphMetric_method == 'smiles_CL' or self.graphMetric_method == 'smiles_TL':
+                targetEmbedding = self.compute_smiles_embedding(batch['smiles'])
+            elif self.graphMetric_method == 'fingerprint_CL' or self.graphMetric_method == 'fingerprint_TL':
+                targetEmbedding = self.compute_fingerprint_embedding(batch['fingerprint'])
+        return targetEmbedding
+            
+        
 
     def genGraphMetric(self, batch):
         with torch.no_grad():
