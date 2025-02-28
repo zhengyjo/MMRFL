@@ -24,24 +24,30 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--type", type=str, default='gin', help="Model type.")
 parser.add_argument("--num_layer", type=int, default=5, help="Number of layers.")
 parser.add_argument("--embed_dim", type=int, default=128, help="Embed dimension.")
-parser.add_argument("--path", type=str, default='', help="smiles file")
+parser.add_argument("--path", type=str, default='/home/zhengyjo/M3-KMGCL-ZZ/Utils/dataset_nmrshiftdb2_smiles_modified_1204.pkl', help="smiles file")
 parser.add_argument("--graphMetric", type=str, default='smiles', help="graphMetric")
-parser.add_argument("--alpha", type=float, default=0.5, help="alpha")
+parser.add_argument("--nodeMetric", type=str, default='peak', help="nodeMetric")
+parser.add_argument("--alpha", type=float, default=0, help="alpha")
 # Parse and print the results
 args = parser.parse_args()
 
 def main():
     # Create the parser and add arguments
-    out_name = "best_" + args.graphMetric + "_alpha_" + str(args.alpha) + "_chemprop"
+    out_name = "best_" + args.graphMetric + "_atom_alpha_" + str(args.alpha) + "_chemprop"
     print('Output name:%s' % out_name)
+    if args.alpha == 1:
+        out_name = "best_" + args.nodeMetric + "_atom_alpha_" + str(args.alpha) + "_chemprop"
+        print('Output name:%s' % out_name)
     
     KMGCLConfig.graphMetric_method = args.graphMetric
+    KMGCLConfig.nodeMetric_method = args.nodeMetric
     KMGCLConfig.alpha = args.alpha
     
     arguments = [
     '--data_path', args.path,
     '--dataset_type', 'kmgcl',
-    '--smiles_columns','smiles'
+    '--smiles_columns','smiles',
+    '--gpu','0'
     ]
     
     pass_args=TrainArgs().parse_args(arguments)
@@ -83,8 +89,8 @@ def main():
 
         if train_loss.avg < best_loss:
             best_loss = train_loss.avg
-            torch.save(model.state_dict(), '/work/zhengyjo/' + out_name + ".pt")
-            torch.save(model.graph_encoder.model.state_dict(),'/work/zhengyjo/' + out_name + "_encoder.pt")
+            torch.save(model.state_dict(), out_name + ".pt")
+            torch.save(model.graph_encoder.model.state_dict(), out_name + "_encoder.pt")
             print("Saved Best Model!")
 
         print("\n")
