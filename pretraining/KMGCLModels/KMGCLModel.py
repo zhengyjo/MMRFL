@@ -218,7 +218,7 @@ class KMGCLModel(nn.Module):
         image_embeddings = self.image_encoder(image)
 #         projection = Projection(image_embeddings.size(-1), self.config.projection_dim, self.config.dropout).to(self.device)
 #         image_embeddings = projection(image_embeddings)
-        return image_embeddingss
+        return image_embeddings
     
     def compute_nmr_embedding(self,nmr):
         nmr_embeddings = self.nmr_encoder(nmr)
