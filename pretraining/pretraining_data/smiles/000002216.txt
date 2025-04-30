@@ -1,0 +1,1 @@
+C1(=C(C(=C(C(=C1[H])OC([H])([H])[H])OC([H])([H])[H])OC([H])([H])[H])[H])OC2(OC(C(C(C2(O[H])[H])(O[H])[H])(O[H])[H])(C(O[H])([H])[H])[H])[H]
