@@ -32,7 +32,7 @@ Contains **visual images** of molecular structures, which may be used in image-b
 Demo folders and files are provided in pretraining/pretraining_data 
 
 ## Special Notes
-After downloading the whole-dataset from nmrshiftdb2, we only keep the atom peaks between 0 and 250 ppm. We also share our whole dataset for pretraining with the following link:
+After downloading the whole-dataset from nmrshiftdb2, we only keep the atom peaks between 0 and 250 ppm. We also share our whole dataset for pretraining with the following [link](https://drive.google.com/file/d/1hQsI1qguEUogKt4leB0qI-oQyvhH0XAE/view?usp=sharing)
 
 ## Usage
 
