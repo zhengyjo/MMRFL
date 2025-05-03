@@ -5,6 +5,7 @@
 - Use relational metric to capture the complex relationships among molecules
 - Explore how fusion helps improve the representation
 
+
 ## When doing the pretraining, please prepare the following folders:
 ####  `pickle` Files for SMILES
 These files contain serialized molecular data in the form of **SMILES** (Simplified Molecular Input Line Entry System) strings, providing a compact textual representation of molecular structures.
@@ -29,6 +30,9 @@ Stores **molecular fingerprints**—bit vector representations capturing structu
 Contains **visual images** of molecular structures, which may be used in image-based modeling or for visualization purposes.
 
 Demo folders and files are provided in pretraining/pretraining_data 
+
+## Special Notes
+After downloading the whole-dataset from nmrshiftdb2, we only keep the atom peaks between 0 and 250 ppm. We also share our whole dataset for pretraining with the following link:
 
 ## Usage
 
