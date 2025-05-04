@@ -352,6 +352,9 @@ def run_training_updated(args: TrainArgs,
                 atom_bond_scaler=atom_bond_scaler,
                 logger=logger
             )
+            
+            
+                
 
             for metric, scores in val_scores.items():
                 # Average validation score\
@@ -369,23 +372,22 @@ def run_training_updated(args: TrainArgs,
             mean_val_score = multitask_mean_updated(val_scores[args.metric], metric=args.metric)
 #             save_checkpoint_multi_intermediate(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
 #                                 atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
-            
-            if args.minimize_score and mean_val_score < best_score or \
-                    not args.minimize_score and mean_val_score > best_score:
-                best_score, best_epoch = mean_val_score, epoch
-                if args.multi_modality_ensemble == 'False':
-                    save_checkpoint(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
-                                atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
-                elif args.multi_modality_ensemble == 'True':
-                     save_checkpoint_multi(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
-                                atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
-                elif args.multi_modality_ensemble == 'Intermediate':
-                     save_checkpoint_multi_intermediate(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
-                                atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
+               
+             #if args.minimize_score and mean_val_score < best_score or not args.minimize_score and mean_val_score > best_score:
+#                 best_score, best_epoch = mean_val_score, epoch
+        if args.multi_modality_ensemble == 'False':
+            save_checkpoint(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
+                        atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
+        elif args.multi_modality_ensemble == 'True':
+             save_checkpoint_multi(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
+                        atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
+        elif args.multi_modality_ensemble == 'Intermediate':
+             save_checkpoint_multi_intermediate(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
+                        atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
                         
 
         # Evaluate on test set using model with best validation score
-        info(f'Model {model_idx} best validation {args.metric} = {best_score:.6f} on epoch {best_epoch}')
+        #info(f'Model {model_idx} best validation {args.metric} = {best_score:.6f} on epoch {best_epoch}')
         if args.multi_modality_ensemble == 'False':
             model = load_checkpoint(os.path.join(save_dir, MODEL_FILE_NAME), device=args.device, logger=logger)
         elif args.multi_modality_ensemble == 'True':
